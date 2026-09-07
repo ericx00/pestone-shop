@@ -1,0 +1,126 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Pestone brand palette (from logo + company profile) */
+    --color-brand-50: #eef7fd;
+    --color-brand-100: #d5ecfa;
+    --color-brand-200: #aedcf5;
+    --color-brand-300: #77c4ec;
+    --color-brand-400: #38a8e0;
+    --color-brand-500: #1a9bd8;   /* logo cyan */
+    --color-brand-600: #1478ac;
+    --color-brand-700: #135f89;
+    --color-brand-800: #14507180; /* placeholder, overridden below */
+    --color-brand-900: #12326b;   /* company navy */
+    --color-brand-950: #0b1f45;
+
+    --color-navy: #12326b;
+    --color-accent: #e8801a;       /* logo burnt orange */
+    --color-accent-dark: #c9641e;
+    --color-gold: #c9971e;         /* profile gold rule */
+}
+
+/* keep the checkbox/radio accent on-brand */
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+    }
+    :focus-visible {
+        outline: 2px solid var(--color-brand-500);
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
+    .btn,
+    .btn-primary,
+    .btn-accent,
+    .btn-ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.5rem;
+        padding: 0.625rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
+        transition: all 0.15s ease;
+        cursor: pointer;
+    }
+    .btn-primary {
+        background-color: var(--color-brand-600);
+        color: #fff;
+    }
+    .btn-primary:hover {
+        background-color: var(--color-brand-700);
+    }
+    .btn-primary:disabled {
+        opacity: 0.5;
+    }
+    .btn-accent {
+        background-color: var(--color-accent);
+        color: #fff;
+    }
+    .btn-accent:hover {
+        background-color: var(--color-accent-dark);
+    }
+    .btn-ghost {
+        border: 1px solid var(--color-slate-300);
+        background-color: #fff;
+        color: var(--color-slate-700);
+    }
+    .btn-ghost:hover {
+        border-color: var(--color-brand-400);
+        color: var(--color-brand-700);
+    }
+    .card {
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-slate-200);
+        background-color: #fff;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    }
+    .input {
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid var(--color-slate-300);
+        background-color: #fff;
+        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    }
+    .input:focus {
+        border-color: var(--color-brand-500);
+        outline: 2px solid transparent;
+        box-shadow: 0 0 0 2px var(--color-brand-200);
+    }
+    .label {
+        margin-bottom: 0.25rem;
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--color-slate-700);
+    }
+    .container-x {
+        margin-inline: auto;
+        width: 100%;
+        max-width: 80rem;
+        padding-inline: 1rem;
+    }
+    @media (min-width: 640px) {
+        .container-x { padding-inline: 1.5rem; }
+    }
+    @media (min-width: 1024px) {
+        .container-x { padding-inline: 2rem; }
+    }
+}

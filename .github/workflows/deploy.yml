@@ -1,0 +1,58 @@
+name: Deploy to cPanel
+
+# Fallback deploy path — use only if cPanel SSH "push to deploy" is unavailable.
+# Requires repo secrets: SSH_HOST, SSH_PORT, SSH_USER, SSH_KEY (private key, PEM).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, curl, gd, intl, zip, bcmath, fileinfo
+
+      - name: Composer install (no-dev)
+        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci && npm run build
+
+      - name: Deploy over SSH (rsync)
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete --exclude='.git' --exclude='.env' --exclude='/storage' --exclude='/public/storage'
+          path: ./
+          remote_path: /home/${{ secrets.SSH_USER }}/pestone-shop/
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          remote_user: ${{ secrets.SSH_USER }}
+          remote_key: ${{ secrets.SSH_KEY }}
+
+      - name: Post-deploy artisan
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.SSH_USER }}/pestone-shop
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan config:cache && php artisan route:cache && php artisan view:cache
+            php artisan filament:optimize || true
+            php artisan queue:restart || true
