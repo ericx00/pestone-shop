@@ -15,12 +15,19 @@ class CatalogImport extends Command
     protected $signature = 'catalog:import
         {--file= : Path to a catalog.json (defaults to database/data/catalog.json)}
         {--markup= : Override markup percent for computed retail prices}
-        {--fresh : Delete existing products/categories/brands first}';
+        {--fresh : Delete existing products/categories/brands first}
+        {--if-empty : Do nothing if the products table already has rows (for deploys)}';
 
     protected $description = 'Import the product catalogue from the DN Solutions price list JSON';
 
     public function handle(): int
     {
+        if ($this->option('if-empty') && \App\Models\Product::exists()) {
+            $this->info('Products already present — skipping import (--if-empty).');
+
+            return self::SUCCESS;
+        }
+
         $path = $this->option('file') ?: database_path('data/catalog.json');
 
         if (! is_file($path)) {

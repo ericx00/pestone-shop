@@ -39,10 +39,14 @@ Click **Create**. cPanel clones `main` to `/home/pestonec/repositories/<path>`.
    **MultiPHP INI Editor** → enable `pdo_mysql, mbstring, curl, gd, intl, zip, bcmath, fileinfo, openssl`.
 2. **MySQL Databases** → create `pestonec_shop` + a user with ALL privileges. Note the login.
 
-## 3. Create `.env` on the server
+## 3. Create `.env` in the repo folder
 
-Use **File Manager** (show hidden files) in `/home/pestonec/repositories/<path>`:
-copy `.env.example` → `.env` and edit:
+Use **File Manager** (Settings → Show Hidden Files) in
+`/home/pestonec/repositories/pestone-shop1/`: copy `.env.example` → `.env` and edit it.
+The deploy script copies this to the live folder on the **first** deploy only and never
+overwrites it afterwards. Leave `APP_KEY=` blank — the deploy generates it.
+
+Minimum to change:
 
 ```
 APP_NAME="Pestone Technologies"
@@ -84,21 +88,17 @@ PESAPAL_CONSUMER_SECRET=
 PESAPAL_IPN_ID=
 ```
 
-## 4. First deploy
+## 4. First deploy (no terminal needed)
 
 cPanel → Git Version Control → **Manage** → **Pull or Deploy** tab → **Deploy HEAD Commit**.
-`.cpanel.yml` runs: it copies the code to `/home/pestonec/pestone-shop`, runs
-`composer install`, `migrate --force`, and caches config/routes/views.
 
-If `APP_KEY` is still blank, generate it once — cPanel **Terminal** (Advanced menu, if your
-host enables it) or ask the host to run:
-```
-cd /home/pestonec/pestone-shop && php artisan key:generate && php artisan migrate --force --seed && php artisan catalog:import --fresh && php artisan storage:link
-```
-Then copy that same `.env` into `/home/pestonec/pestone-shop/.env` (the deploy target).
+`.cpanel.yml` does everything: copies code to `/home/pestonec/pestone-shop`, seeds `.env`
+there, `composer install`, **generates `APP_KEY`**, `migrate --force`, `db:seed` (settings +
+admin user), **`catalog:import`** (only if the products table is empty), `storage:link`, and
+caches config/routes/views. Watch the log panel for errors.
 
-> Tip: keep **one** `.env`, in `/home/pestonec/pestone-shop/.env`, and point the repo's
-> `.env` at it, or just maintain both. The deploy script never overwrites `.env`.
+If `composer install` times out or runs out of memory on your plan, tell me — I'll commit the
+`vendor/` folder so the deploy skips that step.
 
 ## 5. Point the domain at `/public`
 
