@@ -1,111 +1,139 @@
-# Deploying to cPanel — private repo + push-to-deploy
-
-Goal: one `git push` publishes to a **private GitHub repo** *and* lands on the cPanel
-server, which then runs `.cpanel.yml` automatically.
+# Deploying to cPanel (no SSH) — clone the private GitHub repo
 
 Account: `pestonec` · Domain: `pestone.co.ke` (document root → the app's `/public`)
-GitHub identity: `ericx00`
+GitHub: **private** repo `ericx00/pestone-shop`
+
+Flow: you `git push` to GitHub from your PC → in cPanel you click **Update from Remote**
+then **Deploy HEAD Commit**, which runs `.cpanel.yml` (composer install, migrate, cache).
 
 ---
 
-## 1. One-time server prep (in cPanel)
+## 0. A safe token for cPanel (do this first)
 
-1. **PHP version** — *MultiPHP Manager* → set `pestone.co.ke` to **PHP 8.3+** (8.4 preferred).
-   *MultiPHP INI Editor* → enable `pdo_mysql, mbstring, curl, gd, intl, zip, bcmath, fileinfo, openssl`.
-2. **Database** — *MySQL Databases* → create DB `pestonec_shop` + a user, grant ALL. Note the
-   credentials.
-3. **SSH access** — *SSH Access* (some hosts require a support ticket). Note the **host** and
-   **port** (often 22).
-4. **Authorise a deploy key**
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/pestone_deploy -C pestone-deploy
-   ```
-   *SSH Access → Manage SSH Keys → Import Key* (paste the **public** key), then **Authorize** it.
-   Test: `ssh -i ~/.ssh/pestone_deploy -p <port> pestonec@<host>`
+cPanel needs a credential to clone a **private** repo over HTTPS. Don't use a broad
+personal token — make a narrow one:
 
-## 2. Create the repositories
+GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate**
+- **Resource owner:** ericx00
+- **Repository access:** *Only select repositories* → `pestone-shop`
+- **Permissions → Repository → Contents:** **Read-only**
+- **Expiration:** 90 days (regenerate later)
 
-**cPanel → Git™ Version Control → Create**
-- Clone a Repository: **OFF**
-- Repository Path: `/home/pestonec/repositories/pestone-shop`
-- Repository Name: `Pestone Shop`
+Copy the `github_pat_…` value. This is the `TOKEN` used below.
 
-**GitHub** — create a **private** repo `ericx00/pestone-shop` (no README/…).
+## 1. cPanel → Git™ Version Control → Create
 
-## 3. Wire up the fan-out remote (local machine)
+| Field | Value |
+|---|---|
+| **Clone a Repository** | **ON** |
+| **Clone URL** | `https://ericx00:TOKEN@github.com/ericx00/pestone-shop.git` |
+| **Repository Path** | `repositories/pestone-shop` (or `pestone-shop1` — doesn't matter) |
+| **Repository Name** | `Pestone shop` |
 
-```bash
-cd C:/Users/user/pestone-shop
-git remote add origin git@github.com:ericx00/pestone-shop.git
-# push goes to BOTH GitHub and cPanel:
-git remote set-url --add --push origin git@github.com:ericx00/pestone-shop.git
-git remote set-url --add --push origin ssh://pestonec@<host>:<port>/home/pestonec/repositories/pestone-shop.git
-git push -u origin main
+Click **Create**. cPanel clones `main` to `/home/pestonec/repositories/<path>`.
+(If you made an empty `repositories/pestone-shop` earlier, delete that entry from the list first.)
+
+## 2. Server prep (cPanel UI, no terminal needed)
+
+1. **MultiPHP Manager** → set `pestone.co.ke` to **PHP 8.3+**.
+   **MultiPHP INI Editor** → enable `pdo_mysql, mbstring, curl, gd, intl, zip, bcmath, fileinfo, openssl`.
+2. **MySQL Databases** → create `pestonec_shop` + a user with ALL privileges. Note the login.
+
+## 3. Create `.env` on the server
+
+Use **File Manager** (show hidden files) in `/home/pestonec/repositories/<path>`:
+copy `.env.example` → `.env` and edit:
+
+```
+APP_NAME="Pestone Technologies"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://pestone.co.ke
+APP_KEY=            # generated in step 4 (or run `php artisan key:generate` via the cPanel Terminal if you have it)
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_DATABASE=pestonec_shop
+DB_USERNAME=pestonec_shopuser
+DB_PASSWORD=********
+
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+
+MAIL_MAILER=smtp                 # use a cPanel mailbox
+MAIL_HOST=mail.pestone.co.ke
+MAIL_PORT=465
+MAIL_USERNAME=sales@pestone.co.ke
+MAIL_PASSWORD=********
+MAIL_FROM_ADDRESS="sales@pestone.co.ke"
+MAIL_FROM_NAME="Pestone Technologies"
+
+ADMIN_EMAIL=you@pestone.co.ke
+ADMIN_PASSWORD=pick-a-strong-one
+
+MPESA_ENV=sandbox                 # switch to production when live
+MPESA_CONSUMER_KEY=
+MPESA_CONSUMER_SECRET=
+MPESA_SHORTCODE=
+MPESA_PASSKEY=
+
+PESAPAL_ENV=sandbox
+PESAPAL_CONSUMER_KEY=
+PESAPAL_CONSUMER_SECRET=
+PESAPAL_IPN_ID=
 ```
 
-`git remote -v` should show two `(push)` URLs. Every `git push` now delivers to GitHub, then
-to cPanel; cPanel updates its working copy and runs `.cpanel.yml`.
+## 4. First deploy
 
-## 4. First deploy: create `.env` on the server
+cPanel → Git Version Control → **Manage** → **Pull or Deploy** tab → **Deploy HEAD Commit**.
+`.cpanel.yml` runs: it copies the code to `/home/pestonec/pestone-shop`, runs
+`composer install`, `migrate --force`, and caches config/routes/views.
 
-After the first push, `.cpanel.yml` will have copied the code to
-`/home/pestonec/pestone-shop`. SSH in and:
-
-```bash
-cd /home/pestonec/pestone-shop
-cp .env.example .env
-php artisan key:generate
-# edit .env:
-#   APP_ENV=production   APP_DEBUG=false   APP_URL=https://pestone.co.ke
-#   DB_CONNECTION=mysql  DB_DATABASE=pestonec_shop  DB_USERNAME=...  DB_PASSWORD=...
-#   SESSION_DRIVER=database  QUEUE_CONNECTION=database  CACHE_STORE=database
-#   MAIL_* (use the cPanel mailbox / SMTP)
-#   ADMIN_EMAIL / ADMIN_PASSWORD
-#   MPESA_* and PESAPAL_*  (start with *_ENV=sandbox)
-php artisan migrate --force --seed
-php artisan catalog:import --fresh
-php artisan storage:link
+If `APP_KEY` is still blank, generate it once — cPanel **Terminal** (Advanced menu, if your
+host enables it) or ask the host to run:
 ```
+cd /home/pestonec/pestone-shop && php artisan key:generate && php artisan migrate --force --seed && php artisan catalog:import --fresh && php artisan storage:link
+```
+Then copy that same `.env` into `/home/pestonec/pestone-shop/.env` (the deploy target).
+
+> Tip: keep **one** `.env`, in `/home/pestonec/pestone-shop/.env`, and point the repo's
+> `.env` at it, or just maintain both. The deploy script never overwrites `.env`.
 
 ## 5. Point the domain at `/public`
 
-*Domains* (or *Subdomains*) → set the **Document Root** for `pestone.co.ke` to
-`/home/pestonec/pestone-shop/public`. Run *AutoSSL*.
-
-> If your host won't let you change the document root, instead put this in
-> `/home/pestonec/public_html/index.php`:
-> `<?php require '/home/pestonec/pestone-shop/public/index.php';`
-> and copy `/home/pestonec/pestone-shop/public/.htaccess` into `public_html/`.
+**Domains** → `pestone.co.ke` → set **Document Root** to `/home/pestonec/pestone-shop/public`.
+Run **AutoSSL**. If the host won't let you change the document root, put in
+`/home/pestonec/public_html/index.php`:
+```php
+<?php require '/home/pestonec/pestone-shop/public/index.php';
+```
+and copy `/home/pestonec/pestone-shop/public/.htaccess` to `public_html/.htaccess`.
 
 ## 6. Cron (cPanel → Cron Jobs)
 
 ```
-* * * * * /usr/local/bin/php /home/pestonec/pestone-shop/artisan schedule:run >/dev/null 2>&1
-* * * * * /usr/local/bin/php /home/pestonec/pestone-shop/artisan queue:work --stop-when-empty --max-time=55 >/dev/null 2>&1
+* * * * * /usr/local/bin/ea-php83 /home/pestonec/pestone-shop/artisan schedule:run >/dev/null 2>&1
+* * * * * /usr/local/bin/ea-php83 /home/pestonec/pestone-shop/artisan queue:work --stop-when-empty --max-time=55 >/dev/null 2>&1
 ```
 
-## 7. Payments go-live
-
-1. Safaricom Daraja: create a production app, get the **Paybill/Till**, **passkey**,
-   consumer key/secret. Set `MPESA_ENV=production` and the values in `.env`.
-   Callback URL is `https://pestone.co.ke/webhooks/mpesa` (whitelist it in the Daraja portal).
-2. Pesapal: production consumer key/secret → `.env`, `PESAPAL_ENV=production`, then
-   `php artisan pesapal:register-ipn` and paste the printed `PESAPAL_IPN_ID` into `.env`.
-3. `php artisan config:cache`
-
-## Everyday workflow
+## 7. Everyday updates
 
 ```bash
-git switch -c feature/x     # work on a branch
-# ...commits...
-git switch main && git merge feature/x
-git push                    # → GitHub + cPanel, auto-deploys via .cpanel.yml
+# on your PC
+git add -A && git commit -m "..."
+git push
 ```
+Then in cPanel → Git Version Control → **Manage → Pull or Deploy**:
+**Update from Remote**, then **Deploy HEAD Commit**.
 
-Watch the deploy log in **cPanel → Git Version Control → Manage → Pull or Deploy → (log)**.
+(Optional automation later: a GitHub Action can call cPanel's UAPI
+`VersionControlDeployment::create` with a cPanel API token to skip the two clicks.)
 
-## Fallback (host forbids SSH push)
+## 8. Payments go-live
 
-Use `.github/workflows/deploy.yml` (already in the repo): add repo secrets `SSH_HOST`,
-`SSH_PORT`, `SSH_USER`, `SSH_KEY`, then every push to `main` runs the same deploy steps over
-SSH. Same `git push` → live result.
+- **Daraja:** production app → Paybill/Till, passkey, consumer key/secret into `.env`,
+  `MPESA_ENV=production`. Whitelist `https://pestone.co.ke/webhooks/mpesa` in the portal.
+- **Pesapal:** production key/secret into `.env`, `PESAPAL_ENV=production`, then run
+  `php artisan pesapal:register-ipn` and put the printed id in `PESAPAL_IPN_ID`.
+- Re-deploy so `config:cache` picks up the new values.
