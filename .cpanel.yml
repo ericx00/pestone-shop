@@ -1,12 +1,12 @@
 ---
 deployment:
   tasks:
-    # Repo is cloned to /home/pestonec/repositories/pestone-shop
+    # cPanel runs these tasks from the repository directory, whatever it is called.
     # The live app runs from /home/pestonec/pestone-shop (its /public is the domain document root).
-    - export APP_DIR=/home/pestonec/pestone-shop
-    - export REPO_DIR=/home/pestonec/repositories/pestone-shop
+    - export APP_DIR=$HOME/pestone-shop
+    - export REPO_DIR=$(pwd)
     - export COMPOSER=$(command -v composer || echo /opt/cpanel/composer/bin/composer)
-    - export PHP=$(command -v php)
+    - export PHP=$(command -v php || command -v ea-php83 || command -v ea-php84)
 
     - /bin/mkdir -p "$APP_DIR"
     # Sync code, keeping runtime dirs, .env and uploaded storage on the server
@@ -23,6 +23,7 @@ deployment:
     - /bin/cp -R "$REPO_DIR/public/build" "$APP_DIR/public/build"
 
     - cd "$APP_DIR" && "$PHP" "$COMPOSER" install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+    - cd "$APP_DIR" && "$PHP" artisan filament:assets || true
     - cd "$APP_DIR" && "$PHP" artisan storage:link || true
     - cd "$APP_DIR" && "$PHP" artisan migrate --force
     - cd "$APP_DIR" && "$PHP" artisan optimize:clear
