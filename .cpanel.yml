@@ -2,24 +2,23 @@
 deployment:
   tasks:
     # cPanel runs these tasks from the repository directory, whatever it is called.
-    # The live app runs from ~/pestone-shop (its /public is the domain document root).
+    # The app lives in ~/pestone-shop; the account's primary domain document root
+    # is the locked ~/public_html, so we publish the built /public into it.
     - export APP_DIR=$HOME/pestone-shop
+    - export WEB_DIR=$HOME/public_html
     - export REPO_DIR=$(pwd)
     - export COMPOSER=$(command -v composer || echo /opt/cpanel/composer/bin/composer)
     - export PHP=$(command -v php || command -v ea-php84 || command -v ea-php83)
 
-    - /bin/mkdir -p "$APP_DIR"
-    # Sync code, keeping runtime dirs, .env and uploaded storage on the server
-    - /usr/bin/rsync -a --delete --exclude '.git' --exclude '.env' --exclude '/storage' --exclude '/public/storage' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
+    - /bin/mkdir -p "$APP_DIR" "$WEB_DIR"
+    - /usr/bin/rsync -a --delete --exclude '.git' --exclude '.env' --exclude '/storage' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
 
-    # First deploy only: seed the live .env from the one you created in the repo folder.
-    # Never overwrites an existing live .env (-n = no-clobber).
+    # First deploy only: seed the live .env from the one created in the repo folder.
     - /bin/cp -n "$REPO_DIR/.env" "$APP_DIR/.env" || true
 
     - cd "$APP_DIR" && "$PHP" "$COMPOSER" install --no-dev --prefer-dist --optimize-autoloader --no-interaction
     - cd "$APP_DIR" && grep -q '^APP_KEY=base64:' .env || "$PHP" artisan key:generate --force
     - cd "$APP_DIR" && "$PHP" artisan filament:assets || true
-    - cd "$APP_DIR" && "$PHP" artisan storage:link || true
     - cd "$APP_DIR" && "$PHP" artisan migrate --force
     - cd "$APP_DIR" && "$PHP" artisan db:seed --force || true
     - cd "$APP_DIR" && "$PHP" artisan catalog:import --if-empty || true
@@ -28,4 +27,11 @@ deployment:
     - cd "$APP_DIR" && "$PHP" artisan route:cache
     - cd "$APP_DIR" && "$PHP" artisan view:cache
     - cd "$APP_DIR" && "$PHP" artisan filament:optimize || true
+
+    # Publish the web root (static assets + the shim front controller).
+    - /usr/bin/rsync -a --delete --exclude 'cgi-bin' --exclude '.well-known' --exclude 'index.php' --exclude 'storage' "$APP_DIR/public/" "$WEB_DIR/"
+    - /bin/cp "$APP_DIR/deploy/public_html-index.php" "$WEB_DIR/index.php"
+    - /bin/mkdir -p "$APP_DIR/storage/app/public"
+    - /bin/ln -sfn "$APP_DIR/storage/app/public" "$WEB_DIR/storage"
+
     - cd "$APP_DIR" && "$PHP" artisan queue:restart || true

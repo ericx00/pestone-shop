@@ -100,15 +100,15 @@ caches config/routes/views. Watch the log panel for errors.
 If `composer install` times out or runs out of memory on your plan, tell me — I'll commit the
 `vendor/` folder so the deploy skips that step.
 
-## 5. Point the domain at `/public`
+## 5. Web root — handled automatically
 
-**Domains** → `pestone.co.ke` → set **Document Root** to `/home/pestonec/pestone-shop/public`.
-Run **AutoSSL**. If the host won't let you change the document root, put in
-`/home/pestonec/public_html/index.php`:
-```php
-<?php require '/home/pestonec/pestone-shop/public/index.php';
-```
-and copy `/home/pestonec/pestone-shop/public/.htaccess` to `public_html/.htaccess`.
+`pestone.co.ke` is the account's primary domain, so its document root is the locked
+`~/public_html`. The deploy publishes there for you: it rsyncs `pestone-shop/public/`
+(assets + `.htaccess`) into `~/public_html/` and drops in a one-line `index.php` shim
+(`deploy/public_html-index.php`) that hands requests to `~/pestone-shop`.
+
+Nothing to configure — just run **AutoSSL** (cPanel → SSL/TLS Status → Run AutoSSL) once
+the site responds.
 
 ## 6. Cron (cPanel → Cron Jobs)
 
