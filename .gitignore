@@ -19,14 +19,13 @@
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
 _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Committed on purpose so cPanel (no Node) gets built assets:
-#   /public/build  and  /public/{js,css,fonts}/filament
+# Committed on purpose so the cPanel deploy needs neither Composer nor Node:
+#   /vendor  ·  /public/build  ·  /public/{js,css,fonts}/filament
 # Local scratch
 /scratch_*.php
 /database/data/catalog_raw.json

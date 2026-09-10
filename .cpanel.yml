@@ -1,24 +1,22 @@
 ---
 deployment:
   tasks:
-    # cPanel runs these tasks from the repository directory, whatever it is called.
-    # The app lives in ~/pestone-shop; the account's primary domain document root
-    # is the locked ~/public_html, so we publish the built /public into it.
+    # Fast, self-contained deploy: /vendor and /public assets are committed, so
+    # there is NO composer install and NO npm build here — just copy + migrate + cache.
+    # Repo:  ~/repositories/pestone-shop1   App: ~/pestone-shop   Web root (locked): ~/public_html
     - export APP_DIR=$HOME/pestone-shop
     - export WEB_DIR=$HOME/public_html
     - export REPO_DIR=$(pwd)
-    - export COMPOSER=$(command -v composer || echo /opt/cpanel/composer/bin/composer)
-    - export PHP=$(command -v php || command -v ea-php84 || command -v ea-php83)
+    - export PHP=$(command -v php || command -v ea-php84 || command -v ea-php83 || echo php)
+    - export RSYNC=$(command -v rsync || echo rsync)
 
     - /bin/mkdir -p "$APP_DIR" "$WEB_DIR"
-    - /usr/bin/rsync -a --delete --exclude '.git' --exclude '.env' --exclude '/storage' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
+    - "$RSYNC" -a --delete --exclude '.git' --exclude '.env' --exclude '/storage/logs/*' --exclude '/storage/framework/cache/*' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
 
     # First deploy only: seed the live .env from the one created in the repo folder.
     - /bin/cp -n "$REPO_DIR/.env" "$APP_DIR/.env" || true
 
-    - cd "$APP_DIR" && "$PHP" "$COMPOSER" install --no-dev --prefer-dist --optimize-autoloader --no-interaction
     - cd "$APP_DIR" && grep -q '^APP_KEY=base64:' .env || "$PHP" artisan key:generate --force
-    - cd "$APP_DIR" && "$PHP" artisan filament:assets || true
     - cd "$APP_DIR" && "$PHP" artisan migrate --force
     - cd "$APP_DIR" && "$PHP" artisan db:seed --force || true
     - cd "$APP_DIR" && "$PHP" artisan catalog:import --if-empty || true
@@ -29,7 +27,7 @@ deployment:
     - cd "$APP_DIR" && "$PHP" artisan filament:optimize || true
 
     # Publish the web root (static assets + the shim front controller).
-    - /usr/bin/rsync -a --delete --exclude 'cgi-bin' --exclude '.well-known' --exclude 'index.php' --exclude 'storage' "$APP_DIR/public/" "$WEB_DIR/"
+    - "$RSYNC" -a --delete --exclude 'cgi-bin' --exclude '.well-known' --exclude 'index.php' --exclude 'storage' "$APP_DIR/public/" "$WEB_DIR/"
     - /bin/cp "$APP_DIR/deploy/public_html-index.php" "$WEB_DIR/index.php"
     - /bin/mkdir -p "$APP_DIR/storage/app/public"
     - /bin/ln -sfn "$APP_DIR/storage/app/public" "$WEB_DIR/storage"
