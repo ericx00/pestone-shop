@@ -11,7 +11,7 @@ deployment:
     - export RSYNC=$(command -v rsync || echo rsync)
 
     - /bin/mkdir -p "$APP_DIR" "$WEB_DIR"
-    - "$RSYNC" -a --delete --exclude '.git' --exclude '.env' --exclude '/storage/logs/*' --exclude '/storage/framework/cache/*' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
+    - $RSYNC -a --delete --exclude '.git' --exclude '.env' --exclude '/storage/logs/*' --exclude '/storage/framework/cache/*' --exclude '/node_modules' "$REPO_DIR/" "$APP_DIR/"
 
     # First deploy only: seed the live .env from the one created in the repo folder.
     - /bin/cp -n "$REPO_DIR/.env" "$APP_DIR/.env" || true
@@ -27,7 +27,7 @@ deployment:
     - cd "$APP_DIR" && "$PHP" artisan filament:optimize || true
 
     # Publish the web root (static assets + the shim front controller).
-    - "$RSYNC" -a --delete --exclude 'cgi-bin' --exclude '.well-known' --exclude 'index.php' --exclude 'storage' "$APP_DIR/public/" "$WEB_DIR/"
+    - $RSYNC -a --delete --exclude 'cgi-bin' --exclude '.well-known' --exclude 'index.php' --exclude 'storage' "$APP_DIR/public/" "$WEB_DIR/"
     - /bin/cp "$APP_DIR/deploy/public_html-index.php" "$WEB_DIR/index.php"
     - /bin/mkdir -p "$APP_DIR/storage/app/public"
     - /bin/ln -sfn "$APP_DIR/storage/app/public" "$WEB_DIR/storage"
