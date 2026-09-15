@@ -65,7 +65,22 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Africa/Nairobi'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | No-shell hosting deploy
+    |--------------------------------------------------------------------------
+    |
+    | On hosting with no terminal/SSH/cron, DeployController runs migrate/
+    | seed/catalog:import from a browser hit instead. Leave DEPLOY_TOKEN
+    | unset to disable the route entirely.
+    |
+    */
+
+    'deploy_token' => env('DEPLOY_TOKEN'),
+
+    'web_root' => env('WEB_ROOT'),
 
     /*
     |--------------------------------------------------------------------------

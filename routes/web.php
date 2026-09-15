@@ -4,12 +4,16 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\DeployController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\Account\AccountController;
 use Illuminate\Support\Facades\Route;
+
+// No-shell hosting only: 404s unless DEPLOY_TOKEN is set in .env.
+Route::get('/deploy/{token}', [DeployController::class, 'run'])->name('deploy.run');
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 

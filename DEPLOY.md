@@ -1,139 +1,128 @@
-# Deploying to cPanel (no SSH) — clone the private GitHub repo
+# Deploying to cPanel — no terminal, no SSH, no Git Version Control
 
-Account: `pestonec` · Domain: `pestone.co.ke` (document root → the app's `/public`)
-GitHub: **private** repo `ericx00/pestone-shop`
+Account: `pestonec` · Domain: `pestone.co.ke` is the account's **primary domain**, so its
+document root is locked to `~/public_html`.
 
-Flow: you `git push` to GitHub from your PC → in cPanel you click **Update from Remote**
-then **Deploy HEAD Commit**, which runs `.cpanel.yml` (composer install, migrate, cache).
+This host gives us: **File Manager**, **FTP Accounts**, **MySQL/phpMyAdmin**, **MultiPHP
+Manager**, **Cron Jobs** maybe, but no Terminal and Git Version Control doesn't actually
+work here. So the app runs from `~/pestone-shop`, its `public/` is published into the
+locked `~/public_html` webroot, and artisan commands (migrate/seed/import) run through a
+**token-protected URL** in the app instead of a shell (`App\Http\Controllers\DeployController`,
+route `/deploy/{token}`).
+
+Ongoing deploys: **`git push` → GitHub Actions FTP-uploads the app + web root → the Action
+calls the deploy URL** to run migrations/seed/cache. One-time manual setup below.
 
 ---
 
-## 0. A safe token for cPanel (do this first)
+## 1. One-time File Manager setup
 
-cPanel needs a credential to clone a **private** repo over HTTPS. Don't use a broad
-personal token — make a narrow one:
+1. **File Manager** → Settings → tick **Show Hidden Files**.
+2. Create the app folder `/home/pestonec/pestone-shop/` if it doesn't exist yet (the first
+   GitHub Actions run below will populate it).
+3. You'll create `.env` **inside `/home/pestonec/pestone-shop/`** (not a `repositories/`
+   folder — that cPanel Git path is no longer used). Do this *after* step 3 has run once
+   (so the folder exists), or create the folder yourself now and add `.env` directly.
 
-GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate**
-- **Resource owner:** ericx00
-- **Repository access:** *Only select repositories* → `pestone-shop`
-- **Permissions → Repository → Contents:** **Read-only**
-- **Expiration:** 90 days (regenerate later)
+## 2. Database (if not already done)
 
-Copy the `github_pat_…` value. This is the `TOKEN` used below.
+**MySQL Databases**: DB `pestonec_prime`, user `pestonec_admin` — ✅ already created.
 
-## 1. cPanel → Git™ Version Control → Create
+## 3. Create an FTP account for deploys
 
-| Field | Value |
+**cPanel → FTP Accounts → Create FTP Account**
+- Username: `deploy` (becomes something like `deploy@pestone.co.ke`)
+- Directory: **leave it at the home directory** (`/` or `/home/pestonec`) — it must be able
+  to reach *both* `pestone-shop/` and `public_html/`, not just one.
+- Quota: unlimited (or a few hundred MB)
+- Generate a strong password
+
+Note cPanel's **FTP server hostname** (shown on the same page, often `ftp.pestone.co.ke` or
+a server hostname) and the port (21, using FTPS/explicit TLS — cPanel supports this by
+default).
+
+**Give me:** host, username, password, and confirm the two absolute paths I should deploy
+to, e.g. `/pestone-shop` and `/public_html` (check by logging into File Manager and noting
+the folder names relative to the FTP account's root). I'll store them as **encrypted
+GitHub Actions secrets** (never in plain files) — or you can add them yourself under repo
+**Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
 |---|---|
-| **Clone a Repository** | **ON** |
-| **Clone URL** | `https://ericx00:TOKEN@github.com/ericx00/pestone-shop.git` |
-| **Repository Path** | `repositories/pestone-shop` (or `pestone-shop1` — doesn't matter) |
-| **Repository Name** | `Pestone shop` |
+| `FTP_HOST` | e.g. `ftp.pestone.co.ke` |
+| `FTP_USERNAME` | the FTP account username |
+| `FTP_PASSWORD` | the FTP account password |
+| `FTP_APP_DIR` | `/pestone-shop` |
+| `FTP_WEBROOT_DIR` | `/public_html` |
 
-Click **Create**. cPanel clones `main` to `/home/pestonec/repositories/<path>`.
-(If you made an empty `repositories/pestone-shop` earlier, delete that entry from the list first.)
+## 4. First deploy
 
-## 2. Server prep (cPanel UI, no terminal needed)
+Push to `main` (or re-run the "Deploy to cPanel (FTP)" workflow from the GitHub Actions
+tab) once the secrets above exist. This uploads the whole app to `~/pestone-shop` and the
+built `public/` assets + a front-controller shim to `~/public_html`.
 
-1. **MultiPHP Manager** → set `pestone.co.ke` to **PHP 8.3+**.
-   **MultiPHP INI Editor** → enable `pdo_mysql, mbstring, curl, gd, intl, zip, bcmath, fileinfo, openssl`.
-2. **MySQL Databases** → create `pestonec_shop` + a user with ALL privileges. Note the login.
+## 5. Create `.env` (File Manager, one time)
 
-## 3. Create `.env` in the repo folder
-
-Use **File Manager** (Settings → Show Hidden Files) in
-`/home/pestonec/repositories/pestone-shop1/`: copy `.env.example` → `.env` and edit it.
-The deploy script copies this to the live folder on the **first** deploy only and never
-overwrites it afterwards. Leave `APP_KEY=` blank — the deploy generates it.
-
-Minimum to change:
+In `/home/pestonec/pestone-shop/`, copy `.env.example` → `.env`, edit:
 
 ```
 APP_NAME="Pestone Technologies"
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://pestone.co.ke
-APP_KEY=            # generated in step 4 (or run `php artisan key:generate` via the cPanel Terminal if you have it)
+APP_KEY=
 
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_DATABASE=pestonec_shop
-DB_USERNAME=pestonec_shopuser
-DB_PASSWORD=********
+DB_HOST=localhost
+DB_DATABASE=pestonec_prime
+DB_USERNAME=pestonec_admin
+DB_PASSWORD=AR6DXY4181
 
 SESSION_DRIVER=database
 QUEUE_CONNECTION=database
 CACHE_STORE=database
 
-MAIL_MAILER=smtp                 # use a cPanel mailbox
-MAIL_HOST=mail.pestone.co.ke
-MAIL_PORT=465
-MAIL_USERNAME=sales@pestone.co.ke
-MAIL_PASSWORD=********
-MAIL_FROM_ADDRESS="sales@pestone.co.ke"
-MAIL_FROM_NAME="Pestone Technologies"
-
 ADMIN_EMAIL=you@pestone.co.ke
 ADMIN_PASSWORD=pick-a-strong-one
 
-MPESA_ENV=sandbox                 # switch to production when live
-MPESA_CONSUMER_KEY=
-MPESA_CONSUMER_SECRET=
-MPESA_SHORTCODE=
-MPESA_PASSKEY=
-
-PESAPAL_ENV=sandbox
-PESAPAL_CONSUMER_KEY=
-PESAPAL_CONSUMER_SECRET=
-PESAPAL_IPN_ID=
+# Generate with: php -r "echo bin2hex(random_bytes(24));" — or ask me for one.
+DEPLOY_TOKEN=
+WEB_ROOT=/home/pestonec/public_html
 ```
 
-## 4. First deploy (no terminal needed)
+Leave `APP_KEY=` blank — the deploy route generates it.
 
-cPanel → Git Version Control → **Manage** → **Pull or Deploy** tab → **Deploy HEAD Commit**.
+## 6. Run the setup
 
-`.cpanel.yml` does everything: copies code to `/home/pestonec/pestone-shop`, seeds `.env`
-there, `composer install`, **generates `APP_KEY`**, `migrate --force`, `db:seed` (settings +
-admin user), **`catalog:import`** (only if the products table is empty), `storage:link`, and
-caches config/routes/views. Watch the log panel for errors.
+Visit **`https://pestone.co.ke/deploy/<DEPLOY_TOKEN>`** in your browser (paste the same
+token you put in `.env`). It runs, in order: key generation, migrations (creates all
+tables), seeding (admin user + shop settings), the 560-product catalogue import, the
+`public_html/storage` symlink, and cache warm-up — and prints a plain-text log. **Paste me
+that output.**
 
-If `composer install` times out or runs out of memory on your plan, tell me — I'll commit the
-`vendor/` folder so the deploy skips that step.
+Add `DEPLOY_URL=https://pestone.co.ke/deploy/<DEPLOY_TOKEN>` as a GitHub secret afterwards
+so every future push re-runs this automatically (safe to repeat — migrate/seed are
+idempotent, and the catalogue only re-imports if you visit with `?reimport=1`).
 
-## 5. Web root — handled automatically
+## 7. AutoSSL
 
-`pestone.co.ke` is the account's primary domain, so its document root is the locked
-`~/public_html`. The deploy publishes there for you: it rsyncs `pestone-shop/public/`
-(assets + `.htaccess`) into `~/public_html/` and drops in a one-line `index.php` shim
-(`deploy/public_html-index.php`) that hands requests to `~/pestone-shop`.
+cPanel → **SSL/TLS Status** → run **AutoSSL** for `pestone.co.ke` (only needed once
+`public_html/index.php` exists and the domain resolves).
 
-Nothing to configure — just run **AutoSSL** (cPanel → SSL/TLS Status → Run AutoSSL) once
-the site responds.
-
-## 6. Cron (cPanel → Cron Jobs)
-
-```
-* * * * * /usr/local/bin/ea-php83 /home/pestonec/pestone-shop/artisan schedule:run >/dev/null 2>&1
-* * * * * /usr/local/bin/ea-php83 /home/pestonec/pestone-shop/artisan queue:work --stop-when-empty --max-time=55 >/dev/null 2>&1
-```
-
-## 7. Everyday updates
+## Everyday updates
 
 ```bash
-# on your PC
-git add -A && git commit -m "..."
-git push
+git add -A && git commit -m "..." && git push
 ```
-Then in cPanel → Git Version Control → **Manage → Pull or Deploy**:
-**Update from Remote**, then **Deploy HEAD Commit**.
+GitHub Actions does the rest. Watch it under the repo's **Actions** tab.
 
-(Optional automation later: a GitHub Action can call cPanel's UAPI
-`VersionControlDeployment::create` with a cPanel API token to skip the two clicks.)
+## Payments go-live
 
-## 8. Payments go-live
-
-- **Daraja:** production app → Paybill/Till, passkey, consumer key/secret into `.env`,
-  `MPESA_ENV=production`. Whitelist `https://pestone.co.ke/webhooks/mpesa` in the portal.
-- **Pesapal:** production key/secret into `.env`, `PESAPAL_ENV=production`, then run
-  `php artisan pesapal:register-ipn` and put the printed id in `PESAPAL_IPN_ID`.
-- Re-deploy so `config:cache` picks up the new values.
+- **Daraja:** production Paybill/Till + passkey + consumer key/secret → `.env`,
+  `MPESA_ENV=production`. Whitelist `https://pestone.co.ke/webhooks/mpesa` in the Daraja
+  portal.
+- **Pesapal:** production key/secret → `.env`, `PESAPAL_ENV=production`, then visit
+  `/deploy/<token>` again isn't enough for IPN — run `pesapal:register-ipn` the same way:
+  add a step to `DeployController` if needed, or ask me and I'll add a
+  `/deploy/{token}/pesapal-ipn` route.
+- Re-visit the deploy URL so `config:cache` picks up the new values.

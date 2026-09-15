@@ -1,7 +1,18 @@
-name: Deploy to cPanel
+name: Deploy to cPanel (FTP)
 
-# Fallback deploy path — use only if cPanel SSH "push to deploy" is unavailable.
-# Requires repo secrets: SSH_HOST, SSH_PORT, SSH_USER, SSH_KEY (private key, PEM).
+# push to main -> FTP-sync the app + web root to cPanel, then trigger
+# migrate/seed/cache via the token-protected /deploy/{token} route.
+# No SSH, no cPanel Git Version Control, no terminal needed on the host.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   FTP_HOST          e.g. ftp.pestone.co.ke  (or the server hostname/IP cPanel shows)
+#   FTP_USERNAME      the FTP account's username
+#   FTP_PASSWORD      the FTP account's password
+#   FTP_APP_DIR       e.g. /pestone-shop        (absolute path from the FTP account's root)
+#   FTP_WEBROOT_DIR   e.g. /public_html
+# Optional:
+#   DEPLOY_URL        e.g. https://pestone.co.ke/deploy/<DEPLOY_TOKEN>
+#                     (leave unset until you've created .env with a DEPLOY_TOKEN)
 
 on:
   push:
@@ -13,46 +24,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: mbstring, pdo_mysql, curl, gd, intl, zip, bcmath, fileinfo
+      - name: Stage the web root (assets + front-controller shim)
+        run: |
+          rm -rf _webroot
+          cp -r public _webroot
+          cp deploy/public_html-index.php _webroot/index.php
 
-      - name: Composer install (no-dev)
-        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
-
-      - uses: actions/setup-node@v4
+      - name: FTP sync — application
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          node-version: '20'
-      - run: npm ci && npm run build
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          server-dir: ${{ secrets.FTP_APP_DIR }}/
+          local-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            **/_webroot/**
+            **/.env
+            **/storage/logs/**
+            **/storage/framework/cache/**
+            **/storage/framework/sessions/**
+            **/storage/framework/views/**
 
-      - name: Deploy over SSH (rsync)
-        uses: burnett01/rsync-deployments@7.0.1
+      - name: FTP sync — web root
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          switches: -avzr --delete --exclude='.git' --exclude='.env' --exclude='/storage' --exclude='/public/storage'
-          path: ./
-          remote_path: /home/${{ secrets.SSH_USER }}/pestone-shop/
-          remote_host: ${{ secrets.SSH_HOST }}
-          remote_port: ${{ secrets.SSH_PORT }}
-          remote_user: ${{ secrets.SSH_USER }}
-          remote_key: ${{ secrets.SSH_KEY }}
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          server-dir: ${{ secrets.FTP_WEBROOT_DIR }}/
+          local-dir: ./_webroot/
+          exclude: |
+            **/storage/**
 
-      - name: Post-deploy artisan
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /home/${{ secrets.SSH_USER }}/pestone-shop
-            php artisan migrate --force
-            php artisan optimize:clear
-            php artisan config:cache && php artisan route:cache && php artisan view:cache
-            php artisan filament:optimize || true
-            php artisan queue:restart || true
+      - name: Run migrate / seed / cache
+        run: curl -fsS "${{ secrets.DEPLOY_URL }}" || echo "Skipped — DEPLOY_URL not set yet, or the app isn't reachable yet (expected before .env exists on the server)."
