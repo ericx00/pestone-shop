@@ -1,18 +1,20 @@
-name: Deploy to cPanel (FTP)
+name: Deploy to cPanel (FTP + PHP extractor)
 
-# push to main -> FTP-sync the app + web root to cPanel, then trigger
-# migrate/seed/cache via the token-protected /deploy/{token} route.
-# No SSH, no cPanel Git Version Control, no terminal needed on the host.
+# push to main -> zip the app + web root -> FTP-upload just those 2 zips
+# (+ a tiny extractor script) into public_html -> hit a URL so PHP's
+# ZipArchive unpacks them on the server -> hit /deploy/{token} to
+# migrate/seed/cache. No terminal, no SSH, no cPanel Git, no per-file FTP
+# (that was hours-long for ~14k vendor files; this is 2 small file
+# uploads + a few seconds of server-side extraction).
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   FTP_HOST          e.g. ftp.pestone.co.ke  (or the server hostname/IP cPanel shows)
-#   FTP_USERNAME      the FTP account's username
-#   FTP_PASSWORD      the FTP account's password
-#   FTP_APP_DIR       e.g. /pestone-shop        (absolute path from the FTP account's root)
-#   FTP_WEBROOT_DIR   e.g. /public_html
+#   FTP_HOST        e.g. ftp.pestone.co.ke
+#   FTP_USERNAME    the FTP account's username (rooted at the account home)
+#   FTP_PASSWORD    the FTP account's password
+#   DEPLOY_TOKEN    same value you put in the server's .env DEPLOY_TOKEN=
+#                   generate with: php -r "echo bin2hex(random_bytes(24));"
 # Optional:
-#   DEPLOY_URL        e.g. https://pestone.co.ke/deploy/<DEPLOY_TOKEN>
-#                     (leave unset until you've created .env with a DEPLOY_TOKEN)
+#   APP_BASE_URL    e.g. https://pestone.co.ke  (default used if unset)
 
 on:
   push:
@@ -29,45 +31,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stage the web root (assets + front-controller shim)
+      - name: Build the two deploy archives + extractor script
         run: |
-          rm -rf _webroot
-          cp -r public _webroot
+          set -e
+          mkdir -p _payload
+
+          # App: everything except VCS/CI cruft, tests, .env, and the public/
+          # folder's own copy (public/ ships separately as the web-root zip).
+          zip -r -q _payload/_deploy_app.zip . \
+            -x '.git/*' -x '.github/*' -x 'node_modules/*' -x 'tests/*' \
+            -x '_payload/*' -x '.env' -x 'deploy/_deploy.php.template'
+
+          # Web root: contents of public/ at top level, with the shim as index.php.
+          rm -rf _webroot && cp -r public _webroot
           cp deploy/public_html-index.php _webroot/index.php
+          (cd _webroot && zip -r -q ../_payload/_deploy_webroot.zip .)
 
-      - name: FTP sync — application
+          # Extractor script, with the real token baked in.
+          sed "s#__DEPLOY_TOKEN__#${{ secrets.DEPLOY_TOKEN }}#" \
+            deploy/_deploy.php.template > _payload/_deploy.php
+
+          ls -la _payload
+
+      - name: FTP-upload the payload (3 small files) to public_html
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          server-dir: ${{ secrets.FTP_APP_DIR }}/
-          local-dir: ./
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.github/**
-            **/node_modules/**
-            **/tests/**
-            **/_webroot/**
-            **/.env
-            **/storage/logs/**
-            **/storage/framework/cache/**
-            **/storage/framework/sessions/**
-            **/storage/framework/views/**
+          server-dir: /public_html/
+          local-dir: ./_payload/
+          state-name: .ftp-deploy-payload-state.json
 
-      - name: FTP sync — web root
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          server-dir: ${{ secrets.FTP_WEBROOT_DIR }}/
-          local-dir: ./_webroot/
-          exclude: |
-            **/storage/**
+      - name: Extract on the server
+        run: |
+          set -e
+          base="${{ secrets.APP_BASE_URL }}"
+          base="${base:-https://pestone.co.ke}"
+          curl -fsS "$base/_deploy.php?token=${{ secrets.DEPLOY_TOKEN }}"
 
       - name: Run migrate / seed / cache
-        run: curl -fsS "${{ secrets.DEPLOY_URL }}" || echo "Skipped — DEPLOY_URL not set yet, or the app isn't reachable yet (expected before .env exists on the server)."
+        run: |
+          base="${{ secrets.APP_BASE_URL }}"
+          base="${base:-https://pestone.co.ke}"
+          curl -fsS "$base/deploy/${{ secrets.DEPLOY_TOKEN }}" || echo "Not reachable yet — expected before .env exists on the server."

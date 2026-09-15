@@ -1,0 +1,69 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| FTP-only deploy bootstrap
+|--------------------------------------------------------------------------
+| No terminal/SSH/cPanel-API needed: GitHub Actions FTPs THIS file plus
+| app.zip + webroot.zip into public_html, then hits this URL. It extracts
+| both archives into place with PHP's ZipArchive (pure local disk I/O — a
+| few seconds even for thousands of files, unlike transferring each one
+| over FTP) and deletes the zips + itself when done.
+|
+| Token is baked in at build time from the DEPLOY_TOKEN secret — keep this
+| file out of the git repo (it's generated fresh into deploy/_deploy.php by
+| the CI workflow, gitignored).
+*/
+
+set_time_limit(0);
+ini_set('memory_limit', '512M');
+header('Content-Type: text/plain');
+
+$token = $_GET['token'] ?? '';
+if (! hash_equals('__DEPLOY_TOKEN__', $token)) {
+    http_response_code(404);
+    exit("Not found\n");
+}
+
+$webRoot = __DIR__;                 // .../public_html
+$home = dirname($webRoot);          // .../ (account home)
+$appDir = $home.'/pestone-shop';
+
+$jobs = [
+    ['zip' => $webRoot.'/_deploy_app.zip', 'to' => $appDir],
+    ['zip' => $webRoot.'/_deploy_webroot.zip', 'to' => $webRoot],
+];
+
+foreach ($jobs as $job) {
+    echo "Extracting {$job['zip']} -> {$job['to']}\n";
+
+    if (! is_file($job['zip'])) {
+        echo "  skip (not found)\n";
+
+        continue;
+    }
+    if (! is_dir($job['to']) && ! mkdir($job['to'], 0755, true) && ! is_dir($job['to'])) {
+        echo "  FAILED: could not create {$job['to']}\n";
+
+        continue;
+    }
+
+    $zip = new ZipArchive;
+    if ($zip->open($job['zip']) !== true) {
+        echo "  FAILED to open archive\n";
+
+        continue;
+    }
+    $count = $zip->numFiles;
+    if (! $zip->extractTo($job['to'])) {
+        echo "  FAILED to extract\n";
+    } else {
+        echo "  ok ({$count} files)\n";
+    }
+    $zip->close();
+    @unlink($job['zip']);
+}
+
+echo "Done.\n";
+
+@unlink(__FILE__);

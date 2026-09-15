@@ -32,3 +32,8 @@ Thumbs.db
 
 /database/database.sqlite
 /public/serve.log
+
+# CI-generated deploy payload (built fresh by .github/workflows/deploy.yml)
+/_payload
+/_webroot
+/deploy/_deploy.php
