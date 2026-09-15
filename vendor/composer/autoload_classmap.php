@@ -91,6 +91,7 @@ return array(
     'App\\Models\\Setting' => $baseDir . '/app/Models/Setting.php',
     'App\\Models\\User' => $baseDir . '/app/Models/User.php',
     'App\\Notifications\\OrderConfirmed' => $baseDir . '/app/Notifications/OrderConfirmed.php',
+    'App\\Policies\\OrderPolicy' => $baseDir . '/app/Policies/OrderPolicy.php',
     'App\\Providers\\AppServiceProvider' => $baseDir . '/app/Providers/AppServiceProvider.php',
     'App\\Providers\\Filament\\AdminPanelProvider' => $baseDir . '/app/Providers/Filament/AdminPanelProvider.php',
     'App\\Services\\Cart\\CartService' => $baseDir . '/app/Services/Cart/CartService.php',

@@ -95,7 +95,7 @@ class PesapalGateway implements PaymentGateway
             'currency' => $order->currency,
             'amount' => (float) $order->grand_total,
             'description' => 'Payment for order '.$order->number,
-            'callback_url' => route('checkout.return', $order),
+            'callback_url' => $order->trackingUrl('checkout.return'),
             'notification_id' => $this->ipnId(),
             'billing_address' => [
                 'email_address' => $order->customer_email,

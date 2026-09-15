@@ -62,7 +62,7 @@ class ShopTest extends TestCase
         $this->assertSame(108620, $order->subtotal);          // 2 x round(63000 / 1.16)
         $this->assertSame(17380, $order->vat_total);
         $this->assertSame(126000, $order->grand_total);       // pickup = no delivery fee
-        $res->assertRedirect(route('checkout.pay.form', $order));
+        $res->assertRedirect($order->trackingUrl('checkout.pay.form'));
     }
 
     public function test_quote_request_is_stored(): void

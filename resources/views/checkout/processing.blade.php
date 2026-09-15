@@ -3,7 +3,7 @@
 
 @section('content')
 <div class="container-x max-w-lg py-16 text-center"
-     x-data="paymentPoll('{{ route('checkout.status', $order) }}')">
+     x-data="paymentPoll('{{ $order->trackingUrl('checkout.status') }}')">
     <div class="card p-8">
         <template x-if="!done">
             <div>
@@ -28,7 +28,7 @@
                 <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-2xl text-rose-600">!</div>
                 <h1 class="mt-4 text-lg font-bold text-navy">Payment not completed</h1>
                 <p class="mt-2 text-sm text-slate-500">The payment was cancelled or timed out.</p>
-                <a href="{{ route('checkout.pay.form', $order) }}" class="btn-primary mt-4">Try again</a>
+                <a href="{{ $order->trackingUrl('checkout.pay.form') }}" class="btn-primary mt-4">Try again</a>
             </div>
         </template>
     </div>
@@ -56,7 +56,7 @@ function paymentPoll(url) {
         finish(paid, redirect) {
             this.done = true; this.paid = paid;
             clearInterval(this.poll); clearInterval(this.timer);
-            if (paid) { setTimeout(() => window.location = redirect || '{{ route('checkout.return', $order) }}', 1200); }
+            if (paid) { setTimeout(() => window.location = redirect || '{{ $order->trackingUrl('checkout.return') }}', 1200); }
         }
     }
 }

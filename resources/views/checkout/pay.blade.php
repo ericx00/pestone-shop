@@ -14,7 +14,7 @@
                 instructions. You can also call {{ company('phone') }}.
             </div>
         @else
-            <form action="{{ route('checkout.pay', $order) }}" method="post" class="mt-5 space-y-4">
+            <form action="{{ $order->trackingUrl('checkout.pay') }}" method="post" class="mt-5 space-y-4">
                 @csrf
                 <div class="space-y-2 text-sm">
                     @foreach ($gateways as $g)
@@ -33,7 +33,7 @@
             </form>
         @endif
 
-        <a href="{{ route('checkout.return', $order) }}" class="mt-4 block text-center text-xs text-slate-500 hover:text-brand-700">View order details</a>
+        <a href="{{ $order->trackingUrl('checkout.return') }}" class="mt-4 block text-center text-xs text-slate-500 hover:text-brand-700">View order details</a>
     </div>
 </div>
 @endsection

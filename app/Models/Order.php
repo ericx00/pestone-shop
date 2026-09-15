@@ -5,11 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Order extends Model
 {
     protected $fillable = [
-        'number', 'user_id', 'channel', 'status', 'payment_status', 'payment_method',
+        'number', 'user_id', 'guest_token', 'channel', 'status', 'payment_status', 'payment_method',
         'customer_name', 'customer_email', 'customer_phone', 'customer_company',
         'shipping_address', 'delivery_zone',
         'subtotal', 'discount_total', 'vat_total', 'shipping_total', 'grand_total', 'currency',
@@ -30,6 +31,15 @@ class Order extends Model
         'pending', 'awaiting_payment', 'paid', 'processing',
         'shipped', 'completed', 'cancelled', 'refunded',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Order $order) {
+            if (blank($order->guest_token)) {
+                $order->guest_token = Str::random(48);
+            }
+        });
+    }
 
     public function items(): HasMany
     {
@@ -53,11 +63,19 @@ class Order extends Model
 
     public static function generateNumber(): string
     {
+        // Human-friendly, but NOT a secret — access to an order is guarded by
+        // guest_token / ownership / session, never by the number's obscurity.
         do {
-            $number = 'PES-'.now()->format('ymd').'-'.str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $number = 'PES-'.now()->format('ymd').'-'.str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         } while (static::where('number', $number)->exists());
 
         return $number;
+    }
+
+    /** Signed URL a guest can use to view/pay this order without an account. */
+    public function trackingUrl(string $routeName, array $params = []): string
+    {
+        return route($routeName, array_merge(['order' => $this], $params)).'?ot='.$this->guest_token;
     }
 
     public function markPaid(string $method): void

@@ -762,6 +762,7 @@ class ComposerStaticInitf21be3bba2b8163e96b2cb4dc8ca4d55
         'App\\Models\\Setting' => __DIR__ . '/../..' . '/app/Models/Setting.php',
         'App\\Models\\User' => __DIR__ . '/../..' . '/app/Models/User.php',
         'App\\Notifications\\OrderConfirmed' => __DIR__ . '/../..' . '/app/Notifications/OrderConfirmed.php',
+        'App\\Policies\\OrderPolicy' => __DIR__ . '/../..' . '/app/Policies/OrderPolicy.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
         'App\\Providers\\Filament\\AdminPanelProvider' => __DIR__ . '/../..' . '/app/Providers/Filament/AdminPanelProvider.php',
         'App\\Services\\Cart\\CartService' => __DIR__ . '/../..' . '/app/Services/Cart/CartService.php',

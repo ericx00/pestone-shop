@@ -20,7 +20,7 @@
                     <p class="text-sm text-slate-500">Order {{ $order->number }}</p>
                 </div>
             </div>
-            <a href="{{ route('checkout.pay.form', $order) }}" class="btn-primary mt-4">Complete payment</a>
+            <a href="{{ $order->trackingUrl('checkout.pay.form') }}" class="btn-primary mt-4">Complete payment</a>
         @endif
 
         <table class="mt-6 w-full text-sm">

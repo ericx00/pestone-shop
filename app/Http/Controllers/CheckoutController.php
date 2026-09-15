@@ -10,6 +10,7 @@ use App\Services\Payments\PaymentManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class CheckoutController extends Controller
 {
@@ -103,13 +104,19 @@ class CheckoutController extends Controller
 
         $this->cart->clear();
 
-        return redirect()->route('checkout.pay.form', $order);
+        // Grant this browser session standing access to the order it just placed
+        // (the ?ot= token below covers other devices / the confirmation email).
+        $request->session()->put('order_access.'.$order->id, true);
+
+        return redirect($order->trackingUrl('checkout.pay.form'));
     }
 
     /** Show the "pay now" screen for an unpaid order. */
     public function payForm(Order $order)
     {
-        abort_if($order->isPaid(), 302, '', ['Location' => route('checkout.return', $order)]);
+        Gate::authorize('view', $order);
+
+        abort_if($order->isPaid(), 302, '', ['Location' => $order->trackingUrl('checkout.return')]);
 
         return view('checkout.pay', [
             'order' => $order->load('items'),
@@ -119,8 +126,10 @@ class CheckoutController extends Controller
 
     public function pay(Request $request, Order $order)
     {
+        Gate::authorize('pay', $order);
+
         if ($order->isPaid()) {
-            return redirect()->route('checkout.return', $order);
+            return redirect($order->trackingUrl('checkout.return'));
         }
 
         $data = $request->validate([
@@ -150,6 +159,8 @@ class CheckoutController extends Controller
     /** JSON polled by the processing screen. */
     public function status(Order $order)
     {
+        Gate::authorize('view', $order);
+
         $payment = $order->payments()->latest()->first();
 
         if ($payment && ! in_array($payment->status, ['success', 'failed'], true)) {
@@ -168,12 +179,14 @@ class CheckoutController extends Controller
             'payment_status' => $order->payment_status,
             'paid' => $order->isPaid(),
             'gateway_status' => $payment?->status,
-            'redirect' => $order->isPaid() ? route('checkout.return', $order) : null,
+            'redirect' => $order->isPaid() ? $order->trackingUrl('checkout.return') : null,
         ]);
     }
 
     public function return(Order $order)
     {
+        Gate::authorize('view', $order);
+
         $payment = $order->payments()->latest()->first();
         if ($payment && ! $order->isPaid() && ! in_array($payment->status, ['failed'], true)) {
             try {

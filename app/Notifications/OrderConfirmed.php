@@ -35,7 +35,7 @@ class OrderConfirmed extends Notification
             ->line('VAT (16%): KES '.number_format($order->vat_total))
             ->line('Delivery: KES '.number_format($order->shipping_total))
             ->line('**Total paid: KES '.number_format($order->grand_total).'**')
-            ->action('View your order', route('checkout.return', $order))
+            ->action('View your order', $order->trackingUrl('checkout.return'))
             ->line('Our team will be in touch about delivery. Questions? sales@pestone.co.ke / +254 735 120 752');
     }
 }
