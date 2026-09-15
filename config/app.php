@@ -84,6 +84,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Seeded admin account
+    |--------------------------------------------------------------------------
+    |
+    | Read here (not via env() in the seeder) so it still resolves correctly
+    | once config is cached — env() calls made outside a config file return
+    | nothing after `config:cache` runs, which otherwise silently seeds a
+    | throwaway default password on every re-seed.
+    |
+    */
+
+    'admin' => [
+        'name' => env('ADMIN_NAME', 'Pestone Admin'),
+        'email' => env('ADMIN_EMAIL', 'admin@pestone.co.ke'),
+        'password' => env('ADMIN_PASSWORD'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |
