@@ -34,6 +34,37 @@ $jobs = [
     ['zip' => $webRoot.'/_deploy_webroot.zip', 'to' => $webRoot],
 ];
 
+function extract_zip(string $zipPath, string $to): array
+{
+    if (! is_dir($to) && ! mkdir($to, 0755, true) && ! is_dir($to)) {
+        return [false, "could not create {$to}"];
+    }
+
+    // Prefer the zip extension when it's available.
+    if (class_exists('ZipArchive')) {
+        $zip = new ZipArchive;
+        if ($zip->open($zipPath) === true) {
+            $count = $zip->numFiles;
+            $ok = $zip->extractTo($to);
+            $zip->close();
+
+            return $ok ? [true, "{$count} files (ZipArchive)"] : [false, 'ZipArchive extractTo failed'];
+        }
+    }
+
+    // Fall back to the `unzip` binary via exec() — no PHP zip extension needed.
+    if (function_exists('exec')) {
+        $cmd = 'unzip -o -q '.escapeshellarg($zipPath).' -d '.escapeshellarg($to).' 2>&1';
+        exec($cmd, $out, $status);
+
+        return $status === 0
+            ? [true, 'via unzip binary']
+            : [false, 'unzip exited '.$status.': '.implode(' ', $out)];
+    }
+
+    return [false, 'no ZipArchive and no exec() available — ask your host to enable the PHP zip extension'];
+}
+
 foreach ($jobs as $job) {
     echo "Extracting {$job['zip']} -> {$job['to']}\n";
 
@@ -42,26 +73,13 @@ foreach ($jobs as $job) {
 
         continue;
     }
-    if (! is_dir($job['to']) && ! mkdir($job['to'], 0755, true) && ! is_dir($job['to'])) {
-        echo "  FAILED: could not create {$job['to']}\n";
 
-        continue;
-    }
+    [$ok, $detail] = extract_zip($job['zip'], $job['to']);
+    echo $ok ? "  ok ({$detail})\n" : "  FAILED: {$detail}\n";
 
-    $zip = new ZipArchive;
-    if ($zip->open($job['zip']) !== true) {
-        echo "  FAILED to open archive\n";
-
-        continue;
+    if ($ok) {
+        @unlink($job['zip']);
     }
-    $count = $zip->numFiles;
-    if (! $zip->extractTo($job['to'])) {
-        echo "  FAILED to extract\n";
-    } else {
-        echo "  ok ({$count} files)\n";
-    }
-    $zip->close();
-    @unlink($job['zip']);
 }
 
 echo "Done.\n";

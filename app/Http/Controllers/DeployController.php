@@ -56,7 +56,7 @@ class DeployController extends Controller
         }
 
         $step('catalog:import', function () use ($request) {
-            $opts = ['--force' => true];
+            $opts = [];
             if ($request->boolean('reimport')) {
                 $opts['--fresh'] = true;
             } else {
