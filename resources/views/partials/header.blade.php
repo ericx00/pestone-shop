@@ -16,8 +16,12 @@
     </div>
 
     <div class="container-x flex items-center gap-4 py-3">
-        <a href="{{ route('home') }}" class="flex items-center gap-2">
-            <img src="{{ asset('brand/logo.svg') }}" alt="Pestone Technologies" class="h-10 w-auto">
+        <a href="{{ route('home') }}" class="flex items-center gap-2.5">
+            <img src="{{ asset('brand/mark.png') }}" alt="" class="h-10 w-auto">
+            <span class="leading-tight">
+                <span class="block text-lg font-bold text-accent">Pestone</span>
+                <span class="block -mt-1 text-[10px] font-semibold uppercase tracking-widest text-navy">Technologies</span>
+            </span>
         </a>
 
         <form action="{{ route('shop') }}" method="get" class="relative hidden flex-1 md:block">

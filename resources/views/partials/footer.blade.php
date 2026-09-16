@@ -1,7 +1,13 @@
 <footer class="mt-16 border-t border-slate-200 bg-navy text-slate-200">
     <div class="container-x grid gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-            <img src="{{ asset('brand/logo-white.svg') }}" alt="Pestone Technologies" class="h-10 w-auto">
+            <span class="flex items-center gap-2.5">
+                <img src="{{ asset('brand/mark.png') }}" alt="" class="h-10 w-auto">
+                <span class="leading-tight">
+                    <span class="block text-lg font-bold text-accent">Pestone</span>
+                    <span class="block -mt-1 text-[10px] font-semibold uppercase tracking-widest text-white">Technologies</span>
+                </span>
+            </span>
             <p class="mt-3 text-sm text-slate-300">{{ company('tagline') }}. ICT solutions, maintenance support and legacy technology services across Kenya and East Africa.</p>
         </div>
         <div>

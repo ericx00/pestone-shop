@@ -31,8 +31,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('Pestone Admin')
-            ->brandLogo(asset('brand/logo.svg'))
-            ->favicon(asset('brand/favicon.svg'))
+            ->brandLogo(asset('brand/mark.png'))
+            ->brandLogoHeight('2.25rem')
+            ->favicon(asset('brand/favicon-32.png'))
             ->colors([
                 'primary' => Color::hex('#1478ac'),
                 'danger' => Color::Rose,

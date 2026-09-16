@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Pestone Technologies') — {{ company('name', 'Pestone Technologies Ltd') }}</title>
     <meta name="description" content="@yield('meta_description', 'Buy laptops, servers, networking, printers, UPS and ICT accessories in Kenya. Business & personal. Proven Technology Solutions from Pestone Technologies.')">
-    <link rel="icon" href="{{ asset('brand/favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('brand/favicon-32.png') }}" sizes="32x32" type="image/png">
+    <link rel="icon" href="{{ asset('brand/favicon-16.png') }}" sizes="16x16" type="image/png">
+    <link rel="apple-touch-icon" href="{{ asset('brand/apple-touch-icon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>
